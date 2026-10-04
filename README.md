@@ -1,0 +1,2 @@
+# Global Engineering Economy & Financial Calculator
+A multi-country financial engineering dashboard built with Python, Streamlit, and Plotly. Features mortgage amortization, loan schedules, compound interest, and bond valuation models across international banking institutions.
