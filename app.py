@@ -1,6 +1,6 @@
 import streamlit as st
 
-from modules import benchmarks, depreciation, loans, project_worth, savings
+from modules import benchmarks, depreciation, lcca, loans, project_worth, savings
 from modules.common import CURRENCY_SYMBOLS
 
 st.set_page_config(page_title="Engineering Economy & Financial Calculator", page_icon="💵", layout="wide")
@@ -21,6 +21,7 @@ MODULES = [
     "Savings & Fixed Deposit Investment",
     "Depreciation Analysis (SL, DDB & MACRS)",
     "Project Evaluation (PW / FW / EUAW)",
+    "Equipment Life-Cycle Cost (LCCA)",
     "Bank Rate Reference Table",
 ]
 mode = st.sidebar.selectbox("Choose Calculator / Module", MODULES)
@@ -36,6 +37,8 @@ elif mode == MODULES[2]:
     depreciation.render(cur)
 elif mode == MODULES[3]:
     project_worth.render(cur)
+elif mode == MODULES[4]:
+    lcca.render(cur)
 else:
     benchmarks.render(country)
 

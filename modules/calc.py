@@ -232,3 +232,98 @@ def buy_total_cost(price, down, loan_apr_pct, loan_years, horizon_months, resale
         "present_worth_cost": upfront + pmt * pa_factor(rm, pay_months) - equity * pf_factor(rm, horizon_months),
         "monthly_equivalent": nominal / horizon_months,
     }
+
+
+# ---------------------------------------------------------------- lifecycle cost (LCCA)
+def annual_energy_cost(rated_kw: float, load_factor_pct: float, hours_per_year: float,
+                       rate_per_kwh: float, demand_charge_per_kw_month: float = 0.0):
+    """Year-1 electricity cost and annual kWh. Demand charge is billed on rated kW
+    (assumes the equipment runs at full rated input during the billing peak)."""
+    kwh = rated_kw * load_factor_pct / 100 * hours_per_year
+    cost = kwh * rate_per_kwh + rated_kw * demand_charge_per_kw_month * 12
+    return cost, kwh
+
+
+def lcc_cash_flows(initial: float, rebate: float, energy_yr1: float, maint_yr1: float,
+                   overhaul_cost: float, overhaul_year: int, salvage: float, n: int,
+                   energy_esc_pct: float = 0.0, maint_esc_pct: float = 0.0) -> pd.DataFrame:
+    """Year-by-year cost table (costs positive, salvage negative). Year-1 energy and
+    maintenance costs escalate from year 2 onward. overhaul_year = 0 means no overhaul."""
+    ge, gm = energy_esc_pct / 100, maint_esc_pct / 100
+    rows = []
+    for t in range(0, n + 1):
+        row = {
+            "Year": t,
+            "Initial": (initial - rebate) if t == 0 else 0.0,
+            "Energy": energy_yr1 * (1 + ge) ** (t - 1) if t >= 1 else 0.0,
+            "Maintenance": maint_yr1 * (1 + gm) ** (t - 1) if t >= 1 else 0.0,
+            "Overhaul": overhaul_cost if (overhaul_year and t == overhaul_year) else 0.0,
+            "Salvage": -salvage if t == n else 0.0,
+        }
+        row["Total"] = row["Initial"] + row["Energy"] + row["Maintenance"] + row["Overhaul"] + row["Salvage"]
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def present_worth_of(series, rate_pct: float) -> float:
+    i = rate_pct / 100
+    return float(sum(v * (1 + i) ** -t for t, v in enumerate(series)))
+
+
+def lcc_summary(df: pd.DataFrame, rate_pct: float) -> dict:
+    """Present worth by cost component, total life-cycle cost and EUAC."""
+    n = int(df["Year"].max())
+    out = {c: present_worth_of(df[c], rate_pct) for c in ["Initial", "Energy", "Maintenance", "Overhaul", "Salvage", "Total"]}
+    out["EUAC"] = out["Total"] * ap_factor(rate_pct / 100, n)
+    return out
+
+
+def irr(cash_flows, lo: float = -0.99, hi: float = 10.0):
+    """Internal rate of return in %, by bisection. None if there is no sign change."""
+    def npv(r):
+        return sum(cf * (1 + r) ** -t for t, cf in enumerate(cash_flows))
+    if npv(lo) * npv(hi) > 0:
+        return None
+    for _ in range(300):
+        mid = (lo + hi) / 2
+        if npv(lo) * npv(mid) <= 0:
+            hi = mid
+        else:
+            lo = mid
+    return (lo + hi) / 2 * 100
+
+
+def payback_year(cumulative):
+    """First time the cumulative cash flow reaches zero (linear interpolation within the year).
+    0.0 if never negative; None if it never recovers."""
+    cum = list(cumulative)
+    if not cum:
+        return None
+    if cum[0] >= 0:
+        return 0.0
+    for t in range(1, len(cum)):
+        if cum[t] >= 0:
+            return (t - 1) + (-cum[t - 1]) / (cum[t] - cum[t - 1])
+    return None
+
+
+def incremental_analysis(df_base: pd.DataFrame, df_alt: pd.DataFrame, rate_pct: float) -> dict:
+    """Alternative vs baseline: savings stream = baseline cost - alternative cost, by year."""
+    savings = (df_base["Total"] - df_alt["Total"]).tolist()
+    i = rate_pct / 100
+    disc = [s * (1 + i) ** -t for t, s in enumerate(savings)]
+    cum, cum_d, a, b = [], [], 0.0, 0.0
+    for s, d in zip(savings, disc):
+        a += s
+        b += d
+        cum.append(a)
+        cum_d.append(b)
+    return {
+        "savings": savings,
+        "cumulative": cum,
+        "cumulative_discounted": cum_d,
+        "pw_savings": sum(disc),
+        "simple_payback": payback_year(cum),
+        "discounted_payback": payback_year(cum_d),
+        "irr": irr(savings),
+    }
