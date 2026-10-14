@@ -1,6 +1,6 @@
 import streamlit as st
 
-from modules import benchmarks, depreciation, lcca, loans, project_worth, retrofit, savings
+from modules import benchmarks, depreciation, lcca, loans, project_worth, replacement, retrofit, savings
 from modules.common import CURRENCY_SYMBOLS
 
 st.set_page_config(page_title="Engineering Economy & Financial Calculator", page_icon="💵", layout="wide")
@@ -23,6 +23,7 @@ MODULES = [
     "Project Evaluation (PW / FW / EUAW)",
     "Equipment Life-Cycle Cost (LCCA)",
     "Energy Retrofit Payback (LED / VFD)",
+    "Replacement Analysis (Defender vs Challenger)",
     "Bank Rate Reference Table",
 ]
 mode = st.sidebar.selectbox("Choose Calculator / Module", MODULES)
@@ -42,6 +43,8 @@ elif mode == MODULES[4]:
     lcca.render(cur)
 elif mode == MODULES[5]:
     retrofit.render(cur)
+elif mode == MODULES[6]:
+    replacement.render(cur)
 else:
     benchmarks.render(country)
 

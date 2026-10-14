@@ -372,3 +372,67 @@ def retrofit_analysis(qty, kw_before, kw_after, hours, elec_rate, demand_charge,
         "cost_of_saved_energy": (net_cost * ap_factor(i, n) / kwh_saved) if (kwh_saved > 0 and net_cost > 0) else None,
         "co2_tonnes_per_year": kwh_saved * emission_kg_per_kwh / 1000,
     }
+
+
+# ---------------------------------------------------------------- replacement analysis
+def retention_table(capital: float, annual_cost_yr1: float, growth_pct: float, mv_decline_pct: float,
+                    max_years: int, rate_pct: float) -> pd.DataFrame:
+    """Cost of keeping an asset k years, k = 1..max_years.
+
+    capital = money tied up in the asset today (challenger: net first cost; defender: what it
+    could be sold for now, since its original price is sunk). Market value falls by a constant
+    percentage each year; annual operating cost grows by growth_pct from year 2.
+    Columns: operating cost in year k, market value at end of k, marginal cost of year k
+    (the cost of holding the asset one more year) and EUAC if kept k years."""
+    i, g, d = rate_pct / 100, growth_pct / 100, mv_decline_pct / 100
+    rows, pw_ops, mv_prev = [], 0.0, capital
+    for k in range(1, int(max_years) + 1):
+        cost_k = annual_cost_yr1 * (1 + g) ** (k - 1)
+        pw_ops += cost_k * (1 + i) ** -k
+        mv_k = capital * (1 - d) ** k
+        pw_total = capital + pw_ops - mv_k * (1 + i) ** -k
+        rows.append({
+            "Years Kept": k,
+            "Operating Cost in Year": cost_k,
+            "Market Value at End": mv_k,
+            "Marginal Cost of Year": mv_prev * (1 + i) - mv_k + cost_k,
+            "EUAC": pw_total * ap_factor(i, k),
+        })
+        mv_prev = mv_k
+    return pd.DataFrame(rows)
+
+
+def economic_life(table: pd.DataFrame):
+    """(years, EUAC) of the retention period with the lowest EUAC."""
+    idx = table["EUAC"].idxmin()
+    return int(table.loc[idx, "Years Kept"]), float(table.loc[idx, "EUAC"])
+
+
+def replacement_decision(defender: pd.DataFrame, challenger: pd.DataFrame) -> dict:
+    """Compare minimum EUACs. A tie keeps the defender."""
+    d_life, d_euac = economic_life(defender)
+    c_life, c_euac = economic_life(challenger)
+    return {"defender_life": d_life, "defender_euac": d_euac, "challenger_life": c_life,
+            "challenger_euac": c_euac, "replace_now": c_euac < d_euac, "annual_advantage": abs(d_euac - c_euac)}
+
+
+def breakeven_challenger_capital(defender_euac: float, annual_cost_yr1: float, growth_pct: float,
+                                 mv_decline_pct: float, max_years: int, rate_pct: float):
+    """Highest net first cost at which the challenger's minimum EUAC still equals the defender's.
+    None if even a free challenger would cost more per year than the defender."""
+    def gap(cap):
+        return economic_life(retention_table(cap, annual_cost_yr1, growth_pct, mv_decline_pct, max_years, rate_pct))[1] - defender_euac
+    if gap(0.0) >= 0:
+        return None
+    lo, hi = 0.0, max(1.0, defender_euac * max_years * 20)
+    while gap(hi) < 0:
+        hi *= 2
+        if hi > 1e12:
+            return None
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        if gap(mid) < 0:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
