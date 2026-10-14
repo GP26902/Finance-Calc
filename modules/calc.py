@@ -327,3 +327,48 @@ def incremental_analysis(df_base: pd.DataFrame, df_alt: pd.DataFrame, rate_pct: 
         "discounted_payback": payback_year(cum_d),
         "irr": irr(savings),
     }
+
+
+# ---------------------------------------------------------------- energy retrofit (LED / VFD)
+def vfd_power_kw(full_load_kw: float, speed_pct: float, drive_efficiency_pct: float = 97.0) -> float:
+    """Average input power of a variable-torque load (pump/fan) at reduced speed.
+    Affinity laws: power scales with the cube of speed; the drive adds its own losses."""
+    return full_load_kw * (speed_pct / 100) ** 3 / (drive_efficiency_pct / 100)
+
+
+def retrofit_analysis(qty, kw_before, kw_after, hours, elec_rate, demand_charge, coincidence_pct,
+                      cost_per_unit, rebate_per_unit, maint_save_per_unit, n, rate_pct,
+                      esc_e_pct=0.0, esc_m_pct=0.0, emission_kg_per_kwh=0.0) -> dict:
+    """Economics of an energy-efficiency retrofit; savings are year-1 values escalated from year 2."""
+    kw_saved = qty * (kw_before - kw_after)
+    kwh_saved = kw_saved * hours
+    energy1 = kwh_saved * elec_rate + kw_saved * coincidence_pct / 100 * demand_charge * 12
+    maint1 = qty * maint_save_per_unit
+    net_cost = qty * (cost_per_unit - rebate_per_unit)
+    ge, gm, i = esc_e_pct / 100, esc_m_pct / 100, rate_pct / 100
+
+    rows = [{"Year": 0, "Investment": -net_cost, "Energy Savings": 0.0, "Maintenance Savings": 0.0,
+             "Net Cash Flow": -net_cost}]
+    for t in range(1, n + 1):
+        e, m = energy1 * (1 + ge) ** (t - 1), maint1 * (1 + gm) ** (t - 1)
+        rows.append({"Year": t, "Investment": 0.0, "Energy Savings": e, "Maintenance Savings": m,
+                     "Net Cash Flow": e + m})
+    df = pd.DataFrame(rows)
+
+    net = df["Net Cash Flow"].tolist()
+    disc = [v * (1 + i) ** -t for t, v in enumerate(net)]
+    cum = df["Net Cash Flow"].cumsum().tolist()
+    cum_d = pd.Series(disc).cumsum().tolist()
+    npw = sum(disc)
+    pw_savings = sum(disc[1:])
+    return {
+        "flows": df, "cumulative": cum, "cumulative_discounted": cum_d,
+        "kw_saved": kw_saved, "kwh_saved": kwh_saved, "net_cost": net_cost,
+        "energy_savings_yr1": energy1, "maint_savings_yr1": maint1, "savings_yr1": energy1 + maint1,
+        "npw": npw, "euaw": npw * ap_factor(i, n),
+        "simple_payback": payback_year(cum), "discounted_payback": payback_year(cum_d),
+        "irr": irr(net),
+        "sir": pw_savings / net_cost if net_cost > 0 else None,
+        "cost_of_saved_energy": (net_cost * ap_factor(i, n) / kwh_saved) if (kwh_saved > 0 and net_cost > 0) else None,
+        "co2_tonnes_per_year": kwh_saved * emission_kg_per_kwh / 1000,
+    }
