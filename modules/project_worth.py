@@ -3,7 +3,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules import calc
-from modules.common import fmt
+from modules.common import fmt, info, success, warning
 
 
 def render(cur: str) -> None:
@@ -26,11 +26,11 @@ def render(cur: str) -> None:
     m3.metric("Future Worth (FW)", fmt(cur, fw))
 
     if npw > 0:
-        st.success("NPW > 0: the project earns more than the MARR and is economically acceptable.")
+        success("NPW > 0: the project earns more than the MARR and is economically acceptable.")
     elif npw < 0:
-        st.warning("NPW < 0: the project does not earn the MARR at these assumptions.")
+        warning("NPW < 0: the project does not earn the MARR at these assumptions.")
     else:
-        st.info("NPW = 0: the project earns exactly the MARR.")
+        info("NPW = 0: the project earns exactly the MARR.")
 
     flows = [-initial] + [annual] * life
     flows[-1] += salvage

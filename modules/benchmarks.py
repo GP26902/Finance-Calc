@@ -2,6 +2,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from modules.common import info, warning
+
 # Static, illustrative snapshot - NOT live data. Update before relying on it.
 BANK_BENCHMARKS = {
     "United States (USA)": [
@@ -23,10 +25,10 @@ BANK_BENCHMARKS = {
 def render(country: str) -> None:
     st.header("📊 Bank Rate Reference Table")
     st.markdown(f"Illustrative institution rates for `{country}`.")
-    st.warning("Static illustrative snapshot, **not live data**. Verify current rates with each institution before relying on them.")
+    warning("Static illustrative snapshot, **not live data**. Verify current rates with each institution before relying on them.")
 
     if country not in BANK_BENCHMARKS:
-        st.info(f"No reference rates are stored for {country} yet. Enter your lender's rates directly in the loan and savings calculators.")
+        info(f"No reference rates are stored for {country} yet. Enter your lender's rates directly in the loan and savings calculators.")
         return
     df = pd.DataFrame(BANK_BENCHMARKS[country])
     st.dataframe(df, hide_index=True)

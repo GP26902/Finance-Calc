@@ -3,7 +3,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules import calc
-from modules.common import fmt
+from modules.common import caption, fmt
 
 
 def render(cur: str) -> None:
@@ -22,7 +22,7 @@ def render(cur: str) -> None:
     is_apy = rate_type.startswith("APY")
     n = {"Monthly": 12, "Annually": 1, "Daily": 365}[freq]
     if is_apy:
-        st.caption("An APY already includes the effect of compounding, so the frequency does not change the result.")
+        caption("An APY already includes the effect of compounding, so the frequency does not change the result.")
 
     fv = calc.future_value(principal, rate, n, years, is_apy)
     apy = rate if is_apy else calc.effective_annual_yield(rate, n)

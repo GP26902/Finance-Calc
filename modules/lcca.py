@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules import calc
-from modules.common import fmt
+from modules.common import caption, fmt, info, success
 
 _CHILLER_A = dict(name="Standard-efficiency chiller", cost=180000.0, rebate=0.0, kw=300.0, lf=60.0, hours=4000.0,
                   maint=6000.0, oh_cost=30000.0, oh_year=10, salvage=10000.0)
@@ -87,22 +87,22 @@ def render(cur: str) -> None:
     st.markdown("---")
     diff = sA["Total"] - sB["Total"]
     if abs(diff) < 1:
-        st.info("Both options have essentially the same life-cycle cost.")
+        info("Both options have essentially the same life-cycle cost.")
     elif diff > 0:
-        st.success(f"**{B['name']} has the lower life-cycle cost**, saving {fmt(cur, diff)} in present worth over {n} years "
+        success(f"**{B['name']} has the lower life-cycle cost**, saving {fmt(cur, diff)} in present worth over {n} years "
                    f"({fmt(cur, sA['EUAC'] - sB['EUAC'])} per year equivalent).")
     else:
-        st.success(f"**{A['name']} has the lower life-cycle cost**, saving {fmt(cur, -diff)} in present worth over {n} years "
+        success(f"**{A['name']} has the lower life-cycle cost**, saving {fmt(cur, -diff)} in present worth over {n} years "
                    f"({fmt(cur, sB['EUAC'] - sA['EUAC'])} per year equivalent).")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric(f"LCC: {A['name'][:22]}", fmt(cur, sA["Total"]), help="Present worth of all costs net of rebate and salvage.")
-    m2.metric(f"LCC: {B['name'][:22]}", fmt(cur, sB["Total"]))
-    m3.metric("EUAC: A vs B", f"{fmt(cur, sA['EUAC'], 0)} vs {fmt(cur, sB['EUAC'], 0)}", help="Equivalent uniform annual cost.")
-    m4.metric("Annual kWh Saved by B", f"{kwhA - kwhB:,.0f}")
+    m1.metric("Life-Cycle Cost: Option A", fmt(cur, sA["Total"]), help="Present worth of all costs net of rebate and salvage.")
+    m2.metric("Life-Cycle Cost: Option B", fmt(cur, sB["Total"]))
+    m3.metric("EUAC: Option A", fmt(cur, sA["EUAC"], 0), help="Equivalent uniform annual cost of Option A.")
+    m4.metric("EUAC: Option B", fmt(cur, sB["EUAC"], 0), help="Equivalent uniform annual cost of Option B.")
 
     first_cost_gap = (B["cost"] - B["rebate"]) - (A["cost"] - A["rebate"])
-    p1, p2, p3 = st.columns(3)
+    p1, p2, p3, p4 = st.columns(4)
     sp, dp, rr = inc["simple_payback"], inc["discounted_payback"], inc["irr"]
     if first_cost_gap > 0:
         p1.metric("Simple Payback on Extra Cost", f"{sp:.1f} yrs" if sp is not None else "Never")
@@ -110,7 +110,8 @@ def render(cur: str) -> None:
         p3.metric("IRR on Extra Investment", f"{rr:.1f}%" if rr is not None else "n/a",
                   help="Compare with your discount rate / MARR: above it means the extra spend pays off.")
     else:
-        st.caption("Option B costs no more than Option A up front, so payback and incremental IRR do not apply.")
+        caption("Option B costs no more than Option A up front, so payback and incremental IRR do not apply.")
+    p4.metric("Annual kWh Saved by B", f"{kwhA - kwhB:,.0f}")
 
     comp = pd.DataFrame([{"Option": o["name"], "Component": c, f"Present Worth ({cur})": s[c]}
                          for o, s in ((A, sA), (B, sB)) for c in ["Initial", "Energy", "Maintenance", "Overhaul", "Salvage"]])
@@ -125,7 +126,7 @@ def render(cur: str) -> None:
     st.plotly_chart(fig)
 
     st.subheader("Sensitivity: how robust is the decision?")
-    st.caption("Present-worth advantage of Option B over Option A. Positive (green) = B has the lower life-cycle cost.")
+    caption("Present-worth advantage of Option B over Option A. Positive (green) = B has the lower life-cycle cost.")
     rates = sorted({max(0.0, rate + d) for d in (-4, -2, 0, 2, 4)})
     changes = [-20, -10, 0, 10, 20, 40]
     z = []
@@ -144,6 +145,6 @@ def render(cur: str) -> None:
     st.dataframe(table.style.format({c: money for c in table.columns if c != "Year"}), hide_index=True)
     st.download_button("📥 Export Cash Flows (CSV)", table.to_csv(index=False).encode("utf-8"),
                        file_name="lcca_cash_flows.csv", mime="text/csv")
-    st.caption("Before-tax analysis over a common study period; salvage values represent the equipment's remaining value at the "
+    caption("Before-tax analysis over a common study period; salvage values represent the equipment's remaining value at the "
                "end of the study. Energy and maintenance costs escalate from year 2. Illustrative defaults - replace with quotes "
                "and your utility tariff.")

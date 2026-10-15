@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules import calc
-from modules.common import fmt
+from modules.common import caption, fmt, info, success
 
 PRESETS = {
     "Air compressor: aging vs new": {
@@ -82,10 +82,10 @@ def render(cur: str) -> None:
 
     st.markdown("---")
     if res["replace_now"]:
-        st.success(f"**Replace now.** {C['name']} costs {fmt(cur, res['annual_advantage'], 0)} less per year "
+        success(f"**Replace now.** {C['name']} costs {fmt(cur, res['annual_advantage'], 0)} less per year "
                    f"(EUAC {fmt(cur, res['challenger_euac'], 0)} vs {fmt(cur, res['defender_euac'], 0)}).")
     else:
-        st.success(f"**Keep the defender for now.** {D['name']} costs {fmt(cur, res['annual_advantage'], 0)} less per year "
+        success(f"**Keep the defender for now.** {D['name']} costs {fmt(cur, res['annual_advantage'], 0)} less per year "
                    f"(EUAC {fmt(cur, res['defender_euac'], 0)} vs {fmt(cur, res['challenger_euac'], 0)}). "
                    "Re-run this analysis each year as its costs and resale value change.")
 
@@ -97,10 +97,10 @@ def render(cur: str) -> None:
 
     be = calc.breakeven_challenger_capital(res["defender_euac"], C["annual"], C["growth"], C["decline"], C["life"], rate)
     if be is None:
-        st.info("Even a free challenger would cost more per year to operate than the defender, so replacement is never justified on these assumptions.")
+        info("Even a free challenger would cost more per year to operate than the defender, so replacement is never justified on these assumptions.")
     else:
         price = be + C.get("rebate", 0.0)
-        st.info(f"**Break-even:** replacement pays off if the challenger's installed cost is below about **{fmt(cur, price, 0)}** "
+        info(f"**Break-even:** replacement pays off if the challenger's installed cost is below about **{fmt(cur, price, 0)}** "
                 f"(net of rebate {fmt(cur, be, 0)}). Current: {fmt(cur, C['capital'] + C.get('rebate', 0.0), 0)}.")
 
     curves = pd.concat([dt.assign(Asset=D["name"]), ct.assign(Asset=C["name"])])
@@ -113,7 +113,7 @@ def render(cur: str) -> None:
                   labels={"Marginal Cost of Year": f"Cost ({cur})"})
     fig.add_hline(y=res["challenger_euac"], line_dash="dash", annotation_text="Challenger min EUAC")
     st.plotly_chart(fig)
-    st.caption("Where the defender's yearly cost rises above the dashed line, holding on one more year costs more than "
+    caption("Where the defender's yearly cost rises above the dashed line, holding on one more year costs more than "
                "running the new asset.")
 
     money = cur + "{:,.0f}"
@@ -121,5 +121,5 @@ def render(cur: str) -> None:
     for tab, tbl in ((t1, dt), (t2, ct)):
         with tab:
             st.dataframe(tbl.style.format({c: money for c in tbl.columns if c != "Years Kept"}), hide_index=True)
-    st.caption("Market value is assumed to fall by a constant percentage each year; operating costs grow at the stated rate. "
+    caption("Market value is assumed to fall by a constant percentage each year; operating costs grow at the stated rate. "
                "Before-tax analysis. Illustrative defaults: replace with your maintenance history, quotes and resale estimates.")

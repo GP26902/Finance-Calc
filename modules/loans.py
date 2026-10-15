@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules import calc
-from modules.common import fmt
+from modules.common import caption, error, fmt, info, success, warning
 
 LOAN_CATEGORIES = {
     "Home Mortgage": {
@@ -56,15 +56,15 @@ def render_amortization(cur: str, category: str) -> None:
                                value=1000.0, step=250.0, key=f"{k}_fees")
 
     if price <= 0:
-        st.warning("Enter a price / loan amount greater than zero.")
+        warning("Enter a price / loan amount greater than zero.")
         return
     if down > price:
-        st.error("Down payment cannot exceed the purchase price.")
+        error("Down payment cannot exceed the purchase price.")
         return
 
     s = calc.loan_summary(price, down, rate, years, fees)
-    st.info(f"**Financing breakdown:** Price `{fmt(cur, price)}` | Down payment `{fmt(cur, down)}` "
-            f"(`{s['down_pct']:.1f}%`) | **Principal financed:** `{fmt(cur, s['principal'])}`")
+    info(f"**Financing breakdown:** Price **{fmt(cur, price)}** | Down payment **{fmt(cur, down)}** "
+         f"({s['down_pct']:.1f}%) | Principal financed: **{fmt(cur, s['principal'])}**")
 
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Monthly Payment", fmt(cur, s["monthly_payment"]))
@@ -76,7 +76,7 @@ def render_amortization(cur: str, category: str) -> None:
               help="The rate you actually pay once upfront fees are treated as reducing the cash you receive.")
 
     if s["principal"] == 0:
-        st.success("Nothing is financed at this down payment.")
+        success("Nothing is financed at this down payment.")
         return
 
     df = calc.amortization_schedule(s["principal"], rate, s["n_months"])
@@ -141,10 +141,10 @@ def render_buy_vs_lease(cur: str) -> None:
 
     residual = price * residual_pct / 100
     if price <= 0 or down >= price:
-        st.error("Enter a vehicle price greater than the down payment.")
+        error("Enter a vehicle price greater than the down payment.")
         return
     if residual >= price - down:
-        st.error("Residual value must be below the capitalized cost (price minus down payment).")
+        error("Residual value must be below the capitalized cost (price minus down payment).")
         return
 
     def buy_cost(resale_percent: float) -> dict:
@@ -155,18 +155,18 @@ def render_buy_vs_lease(cur: str) -> None:
 
     diff = lease["present_worth_cost"] - buy["present_worth_cost"]
     if abs(diff) < 1:
-        st.info("On a present-worth basis the two options are essentially equal.")
+        info("On a present-worth basis the two options are essentially equal.")
     elif diff > 0:
-        st.success(f"**Buying is cheaper by {fmt(cur, diff)}** (present worth) over {horizon} months, "
+        success(f"**Buying is cheaper by {fmt(cur, diff)}** (present worth) over {horizon} months, "
                    f"about {fmt(cur, diff / horizon)} per month.")
     else:
-        st.success(f"**Leasing is cheaper by {fmt(cur, -diff)}** (present worth) over {horizon} months, "
+        success(f"**Leasing is cheaper by {fmt(cur, -diff)}** (present worth) over {horizon} months, "
                    f"about {fmt(cur, -diff / horizon)} per month.")
 
     c1, c2 = st.columns(2)
     c1.metric("Buy: Monthly Payment", fmt(cur, buy["monthly_payment"]))
     c2.metric("Lease: Monthly Payment (incl. tax)", fmt(cur, lease["payment"]))
-    st.caption(f"Lease money factor = {lease['money_factor']:.5f} | monthly depreciation {fmt(cur, lease['depreciation'])} "
+    caption(f"Lease money factor = {lease['money_factor']:.5f} | monthly depreciation {fmt(cur, lease['depreciation'])} "
                f"+ finance charge {fmt(cur, lease['finance_charge'])} + tax {fmt(cur, lease['tax'])} | "
                f"loan balance at end of horizon {fmt(cur, buy['balance_at_end'])}")
 
@@ -200,5 +200,5 @@ def render_buy_vs_lease(cur: str) -> None:
         sens.append({"Resale value (% of price)": f"{pct:.0f}%", "Buy net cost (PW)": fmt(cur, pw),
                      "Lease advantage (PW)": fmt(cur, pw - lease["present_worth_cost"])})
     st.dataframe(pd.DataFrame(sens), hide_index=True)
-    st.caption("Positive 'Lease advantage' means leasing costs less. Excludes insurance, maintenance, registration and "
+    caption("Positive 'Lease advantage' means leasing costs less. Excludes insurance, maintenance, registration and "
                "wear-and-tear charges, which can differ between the two options.")

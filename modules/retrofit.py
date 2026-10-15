@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 from modules import calc
-from modules.common import fmt
+from modules.common import caption, fmt, success, warning
 
 PRESETS = {
     "LED lighting retrofit": dict(unit="fixtures", qty=120, kw_before=0.46, kw_after=0.15, hours=4500.0, cost=320.0,
@@ -77,7 +77,7 @@ def render(cur: str) -> None:
     f = 1 + scen / 100
 
     if kw_after >= kw_before:
-        st.warning("The proposed power must be lower than the existing power for the retrofit to save energy.")
+        warning("The proposed power must be lower than the existing power for the retrofit to save energy.")
         return
 
     base = dict(qty=qty, kw_before=kw_before, kw_after=kw_after, hours=hours, elec_rate=elec * f, demand_charge=demand * f,
@@ -87,9 +87,9 @@ def render(cur: str) -> None:
 
     st.markdown("---")
     if r["npw"] > 0:
-        st.success(f"**This retrofit adds value:** NPW of {fmt(cur, r['npw'])} over {n} years at a {rate:g}% discount rate.")
+        success(f"**This retrofit adds value:** NPW of {fmt(cur, r['npw'])} over {n} years at a {rate:g}% discount rate.")
     else:
-        st.warning(f"**This retrofit does not earn the {rate:g}% hurdle rate** (NPW {fmt(cur, r['npw'])}) with these inputs.")
+        warning(f"**This retrofit does not earn the {rate:g}% hurdle rate** (NPW {fmt(cur, r['npw'])}) with these inputs.")
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Net Investment", fmt(cur, r["net_cost"], 0))
@@ -108,7 +108,7 @@ def render(cur: str) -> None:
               help="PW of savings / net investment. Above 1.0 means the project pays for itself in present-worth terms.")
     m10.metric("Cost of Saved Energy", f"{fmt(cur, cse, 3)}/kWh" if cse is not None else "n/a",
                help="Levelized cost of each kWh saved. Compare with your electricity rate.")
-    st.caption(f"Reduction: {r['kw_saved']:,.1f} kW total | year-1 energy and demand savings {fmt(cur, r['energy_savings_yr1'], 0)} | "
+    caption(f"Reduction: {r['kw_saved']:,.1f} kW total | year-1 energy and demand savings {fmt(cur, r['energy_savings_yr1'], 0)} | "
                f"maintenance savings {fmt(cur, r['maint_savings_yr1'], 0)}")
 
     df = r["flows"]
@@ -124,7 +124,7 @@ def render(cur: str) -> None:
     st.plotly_chart(px.bar(sav, x="Year", y=f"Savings ({cur})", color="Source", barmode="stack", title="Annual Savings by Source"))
 
     st.subheader("Sensitivity: what drives the result?")
-    st.caption("Change in NPW when each input moves 20% below or above its current value.")
+    caption("Change in NPW when each input moves 20% below or above its current value.")
     base_npw = r["npw"]
     drivers = [
         ("Electricity & demand rates", lambda x: _params(base, elec_rate=base["elec_rate"] * x, demand_charge=base["demand_charge"] * x)),
@@ -149,4 +149,4 @@ def render(cur: str) -> None:
     st.dataframe(df.style.format({c: money for c in df.columns if c != "Year"}), hide_index=True)
     st.download_button("📥 Export Cash Flows (CSV)", df.to_csv(index=False).encode("utf-8"),
                        file_name="retrofit_cash_flows.csv", mime="text/csv")
-    st.caption("Before-tax analysis. Illustrative defaults: replace with vendor quotes, measured power draw and your utility tariff.")
+    caption("Before-tax analysis. Illustrative defaults: replace with vendor quotes, measured power draw and your utility tariff.")
